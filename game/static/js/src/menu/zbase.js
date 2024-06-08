@@ -28,7 +28,6 @@ class AcGameMenu{
 
 	start() {
 		this.add_listening_events();
-		console.log("50");
 	}
 	add_listening_events(){
 		let outer = this;
@@ -40,47 +39,11 @@ class AcGameMenu{
 		});
 		this.$settings.click(function(){
 		});
-		console.log("60");
 	}
 	show(){  //zhan shi menu jie mian
 		this.$menu.show();
 	}
 	hide(){  //guan bi menu jie mian
 		this.$menu.hide();
-	}
-}
-class AcGamePlayground{
-	constructor(root){
-		this.root = root;
-		this.$playground = $(`<div>Game Interface</div>`);
-		this.hide();
-		this.root.$ac_game.append(this.$playground);
-
-		this.start();
-	}
-	start(){
-
-	}
-	update(){
-
-	}
-	show(){   // da kai playground jie mian
-		this.$playground.show();
-	}
-	hide(){   // guan bi playground jie mian
-		this.$playground.hide();
-	}
-}
-class AcGame {
-    	constructor(id) {
-		this.id = id;
-		this.$ac_game = $(`#` + id);
-		this.menu = new AcGameMenu(this);
-		this.playground = new AcGamePlayground(this);
-	
-		this.start();
-    	}
-	start(){
-
 	}
 }
