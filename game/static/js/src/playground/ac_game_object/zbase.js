@@ -6,7 +6,7 @@ class AcGameObject{
 		this.has_called_start = false;
 		this.timedelta = 0; // dang qian ju li shang yi zhen shi jian jian ge hao miao
 	}
-	start(){ //zhi ähui zai di yi zhen zhi xing
+	start(){ //zhi ï¿½hui zai di yi zhen zhi xing
 	}
 	update(){ //mei yi zhen zhi xing yi ci
 
@@ -15,7 +15,7 @@ class AcGameObject{
 	}
 	destroy(){ //shan diao dang qian wu ti
 		this.on_destroy();
-		for(let i = 0;i<AC_GAME_OBJECTS.length;i++){
+		for(let i = 0 ; i < AC_GAME_OBJECTS.length ; i++){
 			if(AC_GAME_OBJECTS[i] === this){
 				AC_GAME_OBJECTS.splice(i, 1);
 				break;
