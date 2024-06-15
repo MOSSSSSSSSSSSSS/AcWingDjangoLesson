@@ -46,6 +46,7 @@ class Settings{
                 <div class="ac-game-settings-register">
                 </div>
             </div>
+            
         `);
         this.$login = this.$settings.find(".ac-game-settings-login");
         this.$login.hide();

@@ -100,17 +100,18 @@
 	color: white;
 	background-color: #4CAF50;
 	border-radius: 10px;
+	cursor: pointer;
 }
 .ac-game-settings-error-messages{
 	color: red;
-	font-size: 0.8vh;
+	font-size: 1.5vh;
 	display: inline;
 	float: left;
 	padding-left: 1vw;
 }
 .ac-game-settings-option{
 	color: white;
-	font-size: 2vh;
+	font-size: 1.5vh;
 	display: inline;
 	float: right;
 	padding-right: 1vw;
@@ -126,9 +127,11 @@
 	left: 50%;
 	transform: translate(-50%, -50%); 
 	cursor: pointer;
+	display: block;
 }
 .ac-game-settings-acwing > div{
 	font-size: 1.5vh;
 	color: white;
 	text-align: center;
+	display: block;
 }
