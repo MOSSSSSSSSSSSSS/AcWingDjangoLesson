@@ -12,7 +12,7 @@ class AcGameMenu{
 			Multiplayer Mode
 		</div>
 		<br>
-		<div class="ac-game-menu-field-item ac-game-menu-field-item-settins">
+		<div class="ac-game-menu-field-item ac-game-menu-field-item-settings">
 			Logout
 		</div>
 	</div>
