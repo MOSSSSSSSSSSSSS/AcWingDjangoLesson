@@ -190,7 +190,7 @@ class Particle extends AcGameObject {
         this.damage_speed = 0;
         this.friction = 0.9;
         this.spend_time = 0;
-
+        this.fireballs = [];
         this.cur_skill = null;
 
         if(this.character !== "robot"){
@@ -213,12 +213,24 @@ class Particle extends AcGameObject {
             return false;
         });
         this.playground.game_map.$canvas.mousedown(function(e){
+            let players = outer.playground.players;
+            if(players[0].character !== "me")return false;
             const rect = outer.ctx.canvas.getBoundingClientRect();
             if(e.which === 3){
-                outer.move_to((e.clientX - rect.left) / outer.playground.scale, (e.clientY - rect.top) / outer.playground.scale);
-            }else{
+                let tx = (e.clientX - rect.left) / outer.playground.scale;
+                let ty = (e.clientY - rect.top) / outer.playground.scale;
+                outer.move_to(tx, ty);
+                if(outer.playground.mode === "multi mode"){
+                    outer.playground.mps.send_move_to(tx, ty);
+                }
+            }else if(e.which === 1){
+                let tx = (e.clientX - rect.left) / outer.playground.scale;
+                let ty = (e.clientY - rect.top) / outer.playground.scale;
                 if(outer.cur_skill === "fireball"){
-                    outer.shoot_fireball((e.clientX - rect.left) / outer.playground.scale, (e.clientY - rect.top) / outer.playground.scale);
+                    let fireball = outer.shoot_fireball(tx, ty);
+                    if(outer.playground.mode === "multi mode"){
+                        outer.playground.mps.send_shoot_fireball(tx, ty, fireball.uuid);
+                    }
                 }
                 outer.cur_skill = null;
             }
@@ -238,7 +250,18 @@ class Particle extends AcGameObject {
         let color = "orange";
         let speed = 0.5;
         let move_length = 1;
-        new FireBall(this.playground, this, x, y, radius, vx, vy ,color, speed, move_length, 0.007);
+        let fireball = new FireBall(this.playground, this, x, y, radius, vx, vy ,color, speed, move_length, 0.007);
+        this.fireballs.push(fireball);
+        return fireball;
+    }
+    destroy_fireball(uuid){
+        for(let i = 0;i < this.fireballs.length; i++){
+            let fireball = this.fireballs[i];
+            if(fireball.uuid === uuid){
+                fireball.destroy();
+                break;
+            }
+        }
     }
     get_dist(x1, y1, x2, y2){
         let dx = x1 - x2;
@@ -272,6 +295,12 @@ class Particle extends AcGameObject {
         this.damage_y = Math.sin(angle);
         this.damage_speed = damage * 100;
         this.speed *= 2;
+    }
+    receive_attack(x, y, angle, damage, ball_uuid, attacker){
+        attacker.destroy_fireball(ball_uuid);
+        this.x = x;
+        this.y = y;
+        this.is_attacked(angle, damage);
     }
     update(){
         this.update_move();
@@ -333,6 +362,7 @@ class Particle extends AcGameObject {
         for(let i = 0;i < this.playground.players.length; i ++ ){
             if(this === this.playground.players[i]){
                 this.playground.players.splice(i, 1);
+                break;
             }
         }
     }
@@ -362,19 +392,28 @@ class FireBall extends AcGameObject{
             this.destroy();
             return false;
         }
+        this.update_move();
+
+        if(this.player.character !== 'enemy'){
+            this.update_attack();
+        }
+        
+        this.render();
+    }
+    update_move(){
         let moved = Math.min(this.move_length, this.speed * this.timedelta / 1000);
         this.x += this.vx * moved;
         this.y += this.vy * moved;
         this.move_length -= moved;
-
+    }
+    update_attack(){
         for(let i = 0;i < this.playground.players.length ; i ++){
             let player = this.playground.players[i];
             if(this.player !== player && this.is_collision(player)){
                 this.attack(player);
+                break;
             }
         }
-        
-        this.render();
     }
     get_dist(x1, y1, x2, y2){
         let dx = x1 - x2;
@@ -391,6 +430,11 @@ class FireBall extends AcGameObject{
     attack(player){
         let angle = Math.atan2(player.y - this.y, player.x - this.x);
         player.is_attacked(angle, this.damage);
+
+        if(this.playground.mode === "multi mode"){
+            this.playground.mps.send_attack(player.uuid, player.x, player.y, angle, this.damage, this.uuid);
+        }
+
         this.destroy();
     }
     render(){
@@ -399,6 +443,16 @@ class FireBall extends AcGameObject{
         this.ctx.arc(this.x * scale, this.y * scale, this.radius * scale, 0, Math.PI * 2, false);
         this.ctx.fillStyle = this.color;
         this.ctx.fill();
+    }
+    on_destroy(){
+        let fireballs = this.player.fireballs;
+        for(let i = 0;i < fireballs.length; i++){
+            let fireball = fireballs[i];
+            if(fireball === this){
+                fireballs.splice(i, 1);
+                break;
+            }
+        }
     }
 }class MultiPlayerSocket {
     constructor(playground){
@@ -409,9 +463,9 @@ class FireBall extends AcGameObject{
         this.start();
     }
     start(){
-        this.reveive();
+        this.receive();
     }
-    reveive(){
+    receive(){
         let outer = this;
         this.ws.onmessage = function(e){
             let data = JSON.parse(e.data);
@@ -420,6 +474,12 @@ class FireBall extends AcGameObject{
             let event = data.event;
             if(event === "create_player"){
                 outer.receive_create_player(uuid, data.username, data.photo);
+            } else if(event === "move_to"){
+                outer.receive_move_to(uuid, data.tx, data.ty);
+            } else if(event === "shoot_fireball"){
+                outer.receive_shoot_fireball(uuid, data.tx, data.ty, data.ball_uuid);
+            } else if(event === "attack"){
+                outer.receive_attack(uuid, data.attackee_uuid, data.x, data.y, data.angle, data.damage, data.ball_uuid);
             }
         };
     }
@@ -427,10 +487,20 @@ class FireBall extends AcGameObject{
         let outer = this;
         this.ws.send(JSON.stringify({
             'uuid': outer.uuid,
-            'event': "create player",
+            'event': "create_player",
             'username': username,
             'photo': photo,
         }));
+    }
+    get_player(uuid){
+        let players = this.playground.players;
+        for( let i = 0; i < players.length; i++){
+            let player = players[i];
+            if(player.uuid === uuid){
+                return player;
+            }
+        }
+        return null;
     }
     receive_create_player(uuid, username, photo){
         let player = new Player(
@@ -446,6 +516,58 @@ class FireBall extends AcGameObject{
         );
         player.uuid = uuid;
         this.playground.players.push(player);
+    }
+    send_move_to(tx, ty){
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "move_to",
+            'uuid': outer.uuid,
+            'tx': tx,
+            'ty': ty,
+        }));
+    }
+    receive_move_to(uuid, tx, ty){
+        let player = this.get_player(uuid);
+        if(player){
+            player.move_to(tx, ty);
+        }
+    }
+    send_shoot_fireball(tx, ty, ball_uuid){
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "shoot_fireball",
+            'uuid': outer.uuid,
+            'tx': tx,
+            'ty': ty,
+            'ball_uuid': ball_uuid,
+        }));
+    }
+    receive_shoot_fireball(uuid, tx, ty, ball_uuid){
+        let player = this.get_player(uuid);
+        if(player){
+            let fireball = player.shoot_fireball(tx, ty);
+            fireball.uuid = ball_uuid;
+        }
+    }
+    send_attack(attackee_uuid, x, y, angle, damage, ball_uuid){
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "attack",
+            'uuid': outer.uuid,
+            'attackee_uuid': attackee_uuid,
+            'x': x,
+            'y': y,
+            'angle': angle,
+            'damage': damage,
+            'ball_uuid': ball_uuid,
+        }));
+    }
+    receive_attack(uuid, attackee_uuid, x, y, angle, damage, ball_uuid){
+        let attacker = this.get_player(uuid);
+        let attackee = this.get_player(attackee_uuid);
+        if(attackee && attacker){
+            attackee.receive_attack(x, y, angle, damage, ball_uuid, attacker);
+        }
     }
 }class AcGamePlayground{
 	constructor(root){
@@ -471,7 +593,7 @@ class FireBall extends AcGameObject{
 	show(mode){   // da kai playground jie mian
 		let outer = this;
 		this.$playground.show();
-		
+		this.mode = mode;
 		this.width = this.$playground.width();
 		this.height = this.$playground.height();
 		this.game_map = new GameMap(this);
@@ -673,7 +795,6 @@ class Settings{
                 password: password,
             },
             success: function(resp){
-                console.log(resp);
                 if(resp.result === "success"){
                     location.reload();
                 }else{
@@ -697,7 +818,6 @@ class Settings{
                 password_confirm: password_confirm,
             },
             success: function(resp){
-                console.log(resp);
                 if(resp.result === "success"){
                     location.reload();
                 }else{
@@ -708,19 +828,18 @@ class Settings{
     }
     logout_on_remote(){
         if(this.platform === "ACAPP"){
-            return false;
-        }
-        
-        $.ajax({
-            url: "https://app6931.acapp.acwing.com.cn/settings/logout/",
-            type: "GET",
-            success: function(resp){
-                console.log(resp);
-                if(resp.result === "success"){
-                    location.reload();
+            this.root.AcWingOS.api.window.close();
+        }else{
+            $.ajax({
+                url: "https://app6931.acapp.acwing.com.cn/settings/logout/",
+                type: "GET",
+                success: function(resp){
+                    if(resp.result === "success"){
+                        location.reload();
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     login(){

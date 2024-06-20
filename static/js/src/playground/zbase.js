@@ -22,7 +22,7 @@ class AcGamePlayground{
 	show(mode){   // da kai playground jie mian
 		let outer = this;
 		this.$playground.show();
-		
+		this.mode = mode;
 		this.width = this.$playground.width();
 		this.height = this.$playground.height();
 		this.game_map = new GameMap(this);
