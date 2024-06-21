@@ -135,7 +135,7 @@ class ChatField{
                 if(text){
                     outer.$input.val("");
                     outer.add_message(username, text);
-                    outer.playground.mps.send_message(text);
+                    outer.playground.mps.send_message(username, text);
                 }
                 return false;
             }
@@ -690,7 +690,7 @@ class FireBall extends AcGameObject{
             } else if (event === "blink"){
                 outer.receive_blink(uuid, data.tx, data.ty);
             } else if (event === "message"){
-                outer.receive_message(uuid, data.text);
+                outer.receive_message(uuid, data.username, data.text);
             }
         };
     }
@@ -795,19 +795,17 @@ class FireBall extends AcGameObject{
             player.blink(tx, ty);
         }
     }
-    send_message(text){
+    send_message(username, text){
         let outer = this;
         this.ws.send(JSON.stringify({
             'event': "message",
             'uuid': outer.uuid,
+            'username': username,
             'text': text,
         }));
     }
-    receive_message(uuid, text){
-        let player = this.get_player(uuid);
-        if(player){
-            player.playground.chat_field.add_message(player.username, text);
-        }
+    receive_message(uuid, username, text){
+        this.playground.chat_field.add_message(username, text);
     }
 }class AcGamePlayground{
 	constructor(root){
