@@ -27,8 +27,19 @@ class Player extends AcGameObject{
             this.img = new Image();
             this.img.src = this.photo;
         }
+        if(this.character === "me"){
+            this.fireball_coldtime = 3;
+        }
     }
     start(){
+        this.playground.player_count++;
+        this.playground.notice_board.write("Number of people ready : " + this.playground.player_count);
+
+        if(this.playground.player_count >= 3){
+            this.playground.state = "fighting";
+            this.playground.notice_board.write("Fighting");
+        }
+
         if(this.character === "me"){
             this.add_listening_events();
         }else if(this.character === "robot"){
@@ -43,8 +54,7 @@ class Player extends AcGameObject{
             return false;
         });
         this.playground.game_map.$canvas.mousedown(function(e){
-            let players = outer.playground.players;
-            if(players[0].character !== "me")return false;
+            if(outer.playground.state !== "fighting")return false;
             const rect = outer.ctx.canvas.getBoundingClientRect();
             if(e.which === 3){
                 let tx = (e.clientX - rect.left) / outer.playground.scale;
@@ -54,6 +64,7 @@ class Player extends AcGameObject{
                     outer.playground.mps.send_move_to(tx, ty);
                 }
             }else if(e.which === 1){
+                if(outer.fireball_coldtime > outer.eps)return false;
                 let tx = (e.clientX - rect.left) / outer.playground.scale;
                 let ty = (e.clientY - rect.top) / outer.playground.scale;
                 if(outer.cur_skill === "fireball"){
@@ -66,6 +77,8 @@ class Player extends AcGameObject{
             }
         });
         $(window).keydown(function(e){
+            if(outer.playground.state !== "fighting")return false;
+            if(outer.fireball_coldtime > outer.eps)return false;
             if(e.which === 81){ // q
                 outer.cur_skill = "fireball";
                 return false;
@@ -82,6 +95,9 @@ class Player extends AcGameObject{
         let move_length = 1;
         let fireball = new FireBall(this.playground, this, x, y, radius, vx, vy ,color, speed, move_length, 0.007);
         this.fireballs.push(fireball);
+
+        this.fireball_coldtime = 3;
+
         return fireball;
     }
     destroy_fireball(uuid){
@@ -118,6 +134,20 @@ class Player extends AcGameObject{
         }
         this.radius -= damage;
         if(this.radius < this.eps) {
+            this.playground.player_count --;
+            if(this.character === "me"){
+                this.playground.notice_board.write("You Lose!");
+                this.playground.state = "over";
+            } else {
+                if(this.playground.state === "over"){
+                } else {
+                    if(this.playground.player_count === 1){
+                        this.playground.notice_board.write("You Win!");
+                    } else {
+                        this.playground.notice_board.write("Number of people surviving : " + this.playground.player_count);
+                    }
+                }
+            }
             this.destroy();
             return false;
         }
@@ -133,13 +163,21 @@ class Player extends AcGameObject{
         this.is_attacked(angle, damage);
     }
     update(){
+        this.spend_time += this.timedelta / 1000;
+        if(this.character === "me" && this.playground.state === "fighting"){
+            this.update_coldtime();
+        }
         this.update_move();
         this.render();
+
+    }
+    update_coldtime(){
+        this.fireball_coldtime -= this.timedelta / 1000;
+        this.fireball_coldtime = Math.max(this.fireball_coldtime, 0);
     }
     update_move(){
         if(this.character === "robot"){
-            this.spend_time += this.timedelta / 1000;
-            if(this.spend_time > 4 && Math.random() < 1 / 300.0){
+            if(this.spend_time > 3 && Math.random() < 1 / 300.0){
                 let player = this.playground.players[Math.floor(Math.random() * this.playground.players.length)];
                 if(player !== this){
                     let tx = player.x + player.speed * player.vx * this.timedelta / 1000 * 0.3;
